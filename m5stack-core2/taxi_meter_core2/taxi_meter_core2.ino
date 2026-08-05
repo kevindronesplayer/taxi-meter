@@ -27,6 +27,7 @@
 #include <M5Unified.h>
 #include <TinyGPSPlus.h>
 #include <math.h>
+#include <string.h>
 
 // ---------------- GPS ----------------
 static const int GPS_RX_PIN = 13; // Port C: Core2 RX <- GPS TX
@@ -90,6 +91,11 @@ struct Btn {
 };
 Btn buttons[5];
 const int BTN_BAR_H = 46;
+
+// Off-screen buffer: everything is drawn into this sprite and pushed to
+// the real panel in one shot, so the panel never shows a half-drawn
+// frame (which is what read as screen flicker).
+M5Canvas canvas(&M5.Display);
 
 uint16_t colBg, colScreen, colScreenNight, colInk, colInkNight, colRed, colRedDim,
          colGreen, colGreenDim, colPanel, colAmber, colWhite, colMuted;
@@ -240,12 +246,12 @@ void onRegionTap() {
 // ---------------- Drawing ----------------
 void drawButton(int idx, uint16_t bg, bool dim) {
   int x = buttons[idx].x, y = buttons[idx].y, w = buttons[idx].w, h = buttons[idx].h;
-  M5.Display.fillRect(x, y, w, h, bg);
-  M5.Display.setTextDatum(top_center);
-  M5.Display.setTextColor(dim ? colMuted : colWhite, bg);
-  M5.Display.setTextSize(1);
-  M5.Display.drawString(buttons[idx].l1, x + w / 2, y + 3);
-  M5.Display.drawString(buttons[idx].l2, x + w / 2, y + 16);
+  canvas.fillRect(x, y, w, h, bg);
+  canvas.setTextDatum(top_center);
+  canvas.setTextColor(dim ? colMuted : colWhite, bg);
+  canvas.setTextSize(1);
+  canvas.drawString(buttons[idx].l1, x + w / 2, y + 3);
+  canvas.drawString(buttons[idx].l2, x + w / 2, y + 16);
 }
 
 void drawButtons() {
@@ -266,43 +272,51 @@ void drawScreen() {
   uint16_t ink = nightNow ? colInkNight : colInk;
 
   // top status bar
-  M5.Display.fillRect(0, 0, w, topH, colBg);
-  M5.Display.setTextDatum(top_left);
-  M5.Display.setTextColor(colMuted, colBg);
-  M5.Display.setTextSize(1);
+  canvas.fillRect(0, 0, w, topH, colBg);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(colMuted, colBg);
+  canvas.setTextSize(1);
   const char* statusLabel = status == VACANT ? "VACANT" : (status == RUNNING ? "ON TRIP" : "STOPPED");
-  M5.Display.drawString(statusLabel, 4, 5);
+  canvas.drawString(statusLabel, 4, 5);
 
-  M5.Display.setTextDatum(top_right);
+  // battery %, pinned to the very top-right corner
+  int batt = M5.Power.getBatteryLevel();
+  char battBuf[8];
+  if (batt >= 0) sprintf(battBuf, "%d%%", batt); else strcpy(battBuf, "--");
+  canvas.setTextDatum(top_right);
+  canvas.setTextColor(colWhite, colBg);
+  canvas.drawString(battBuf, w - 4, 5);
+  int battW = canvas.textWidth(battBuf);
+
+  // GPS fix indicator, just to the left of the battery reading
   bool fix = gps.location.isValid();
-  M5.Display.setTextColor(fix ? colGreen : colRed, colBg);
-  M5.Display.drawString(fix ? "GPS FIX" : "NO FIX", w - 4, 5);
+  canvas.setTextColor(fix ? colGreen : colRed, colBg);
+  canvas.drawString(fix ? "GPS FIX" : "NO FIX", w - 4 - battW - 10, 5);
 
   // main LCD-style panel
-  M5.Display.fillRoundRect(2, screenY, w - 4, screenH, 8, bg);
+  canvas.fillRoundRect(2, screenY, w - 4, screenH, 8, bg);
 
-  M5.Display.setTextDatum(top_left);
-  M5.Display.setTextColor(ink, bg);
-  M5.Display.setTextSize(1);
-  M5.Display.drawString(currentRegion().name, 10, screenY + 6);
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(ink, bg);
+  canvas.setTextSize(1);
+  canvas.drawString(currentRegion().name, 10, screenY + 6);
 
   char hms[10];
   formatHMS(elapsedSec, hms);
-  M5.Display.setTextSize(2);
-  M5.Display.drawString(hms, 10, screenY + 22);
+  canvas.setTextSize(3);
+  canvas.drawString(hms, 10, screenY + 26);
 
   // fare, big, right aligned
   char fareBuf[16];
   sprintf(fareBuf, "%ld", computeFare());
-  M5.Display.setTextDatum(top_right);
-  M5.Display.setTextSize(4);
-  M5.Display.drawString(fareBuf, w - 14, screenY + 14);
-  M5.Display.setTextSize(1);
-  M5.Display.drawString("FARE", w - 14, screenY + 4);
+  canvas.setTextDatum(top_right);
+  canvas.setTextSize(1);
+  canvas.drawString("FARE", w - 14, screenY + 4);
+  canvas.setTextSize(6);
+  canvas.drawString(fareBuf, w - 14, screenY + 16);
 
   // four mini cells
-  int cellY = screenY + 50;
-  int cellH = screenH - 50 - 6;
+  int cellY = screenY + 70;
   int cellW = (w - 16) / 4;
   const char* labels[4] = { "DIST km", "WAIT", "TOLL", "NIGHT" };
   char v0[8], v1[8], v2[8], v3[8];
@@ -314,19 +328,19 @@ void drawScreen() {
 
   for (int i = 0; i < 4; i++) {
     int cx = 8 + i * cellW;
-    M5.Display.setTextDatum(top_left);
-    M5.Display.setTextColor(ink, bg);
-    M5.Display.setTextSize(1);
-    M5.Display.drawString(labels[i], cx, cellY);
-    M5.Display.setTextSize(2);
-    M5.Display.drawString(vals[i], cx, cellY + 14);
+    canvas.setTextDatum(top_left);
+    canvas.setTextColor(ink, bg);
+    canvas.setTextSize(1);
+    canvas.drawString(labels[i], cx, cellY);
+    canvas.setTextSize(3);
+    canvas.drawString(vals[i], cx, cellY + 12);
   }
 
   if (resetArmedAt != 0 && status == RUNNING) {
-    M5.Display.setTextDatum(top_left);
-    M5.Display.setTextColor(colAmber, bg);
-    M5.Display.setTextSize(1);
-    M5.Display.drawString("TAP F1 AGAIN TO RESET", 10, screenY + screenH - 12);
+    canvas.setTextDatum(top_left);
+    canvas.setTextColor(colAmber, bg);
+    canvas.setTextSize(1);
+    canvas.drawString("TAP F1 AGAIN TO RESET", 10, screenY + screenH - 12);
   }
 
   drawButtons();
@@ -335,8 +349,8 @@ void drawScreen() {
 void drawReceipt() {
   int w = M5.Display.width();
   int h = M5.Display.height();
-  M5.Display.fillRect(20, 20, w - 40, h - 40, colWhite);
-  M5.Display.drawRect(20, 20, w - 40, h - 40, colInk);
+  canvas.fillRect(20, 20, w - 40, h - 40, colWhite);
+  canvas.drawRect(20, 20, w - 40, h - 40, colInk);
 
   long fare = computeFare();
   long night = computeNight(fare);
@@ -344,26 +358,26 @@ void drawReceipt() {
   long total = fare + night + toll;
 
   int x = 34, y = 32, lh = 18;
-  M5.Display.setTextDatum(top_left);
-  M5.Display.setTextColor(colInk, colWhite);
-  M5.Display.setTextSize(2);
-  M5.Display.drawString("RECEIPT", x, y); y += lh + 6;
-  M5.Display.setTextSize(1);
-  M5.Display.drawString(currentRegion().name, x, y); y += lh;
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(colInk, colWhite);
+  canvas.setTextSize(2);
+  canvas.drawString("RECEIPT", x, y); y += lh + 6;
+  canvas.setTextSize(1);
+  canvas.drawString(currentRegion().name, x, y); y += lh;
   char hms[10]; formatHMS(elapsedSec, hms);
   char line[48];
-  sprintf(line, "Trip time: %s", hms); M5.Display.drawString(line, x, y); y += lh;
-  sprintf(line, "Distance: %.2f km", distanceKm); M5.Display.drawString(line, x, y); y += lh;
-  sprintf(line, "Fare:   $%ld", fare); M5.Display.drawString(line, x, y); y += lh;
-  sprintf(line, "Toll:   $%ld", toll); M5.Display.drawString(line, x, y); y += lh;
-  sprintf(line, "Night:  $%ld", night); M5.Display.drawString(line, x, y); y += lh + 4;
-  M5.Display.setTextSize(2);
-  sprintf(line, "TOTAL: $%ld", total); M5.Display.drawString(line, x, y);
+  sprintf(line, "Trip time: %s", hms); canvas.drawString(line, x, y); y += lh;
+  sprintf(line, "Distance: %.2f km", distanceKm); canvas.drawString(line, x, y); y += lh;
+  sprintf(line, "Fare:   $%ld", fare); canvas.drawString(line, x, y); y += lh;
+  sprintf(line, "Toll:   $%ld", toll); canvas.drawString(line, x, y); y += lh;
+  sprintf(line, "Night:  $%ld", night); canvas.drawString(line, x, y); y += lh + 4;
+  canvas.setTextSize(2);
+  sprintf(line, "TOTAL: $%ld", total); canvas.drawString(line, x, y);
 
-  M5.Display.setTextDatum(bottom_center);
-  M5.Display.setTextSize(1);
-  M5.Display.setTextColor(colMuted, colWhite);
-  M5.Display.drawString("tap anywhere to close", w / 2, h - 26);
+  canvas.setTextDatum(bottom_center);
+  canvas.setTextSize(1);
+  canvas.setTextColor(colMuted, colWhite);
+  canvas.drawString("tap anywhere to close", w / 2, h - 26);
 }
 
 // ---------------- Touch ----------------
@@ -400,11 +414,15 @@ void setup() {
   initColors();
   layoutButtons();
 
+  canvas.setColorDepth(16);
+  canvas.createSprite(M5.Display.width(), M5.Display.height());
+  canvas.fillSprite(colBg);
+
   Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 
   lastSecondMillis = millis();
-  M5.Display.fillScreen(colBg);
   drawScreen();
+  canvas.pushSprite(0, 0);
 }
 
 void loop() {
@@ -426,5 +444,6 @@ void loop() {
   if (now - lastDraw >= 200) {
     lastDraw = now;
     if (showingReceipt) drawReceipt(); else drawScreen();
+    canvas.pushSprite(0, 0);
   }
 }
