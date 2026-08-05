@@ -80,7 +80,14 @@ unsigned long lastSecondMillis = 0;
 unsigned long resetArmedAt = 0; // 0 = not armed
 
 // ---------------- UI layout ----------------
-struct Btn { int x, y, w, h; const char* l1; const char* l2; };
+struct Btn {
+  int x;
+  int y;
+  int w;
+  int h;
+  const char* l1;
+  const char* l2;
+};
 Btn buttons[5];
 const int BTN_BAR_H = 46;
 
