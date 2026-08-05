@@ -13,7 +13,6 @@
     --screen-dark-a:#2c3a2c;
     --screen-dark-b:#1b241b;
     --ink:#12210c;
-    --ghost:rgba(0,0,0,.18);
     --red:#c0392b;
     --red-dim:#5a2019;
     --amber:#e8b93b;
@@ -84,10 +83,7 @@
   }
   .status-pill.running{background:rgba(192,57,43,.25); color:#7a1f14;}
 
-  .lcd-wrap{ position:relative; display:inline-grid; }
-  .lcd-wrap > *{ grid-area:1/1; }
-  .ghost{ color:var(--ghost); user-select:none; text-align:right; }
-  .value{ color:var(--ink); font-variant-numeric:tabular-nums; text-align:right; }
+  .value{ color:var(--ink); font-variant-numeric:tabular-nums; display:block; }
 
   .fare-row{ display:flex; align-items:flex-end; justify-content:space-between; margin:6px 0 2px;}
   .fare-label{ font-size:13px; font-weight:800; opacity:.7; }
@@ -231,19 +227,13 @@
 
     <div class="clock-block">
       <div class="clock-label">行車時間 時：分：秒</div>
-      <div class="lcd-wrap">
-        <span class="ghost clock-lcd">88:88:88</span>
-        <span class="value clock-lcd" id="tripClock">00:00:00</span>
-      </div>
+      <span class="value clock-lcd" id="tripClock">00:00:00</span>
     </div>
 
     <div class="fare-row">
       <div>
         <div class="fare-label">車　資</div>
-        <div class="lcd-wrap">
-          <span class="ghost fare-lcd">8888</span>
-          <span class="value fare-lcd" id="fareValue">0</span>
-        </div>
+        <span class="value fare-lcd" id="fareValue">0</span>
       </div>
       <div class="fare-unit">元</div>
     </div>
@@ -251,34 +241,22 @@
     <div class="grid2">
       <div class="cell">
         <div class="cell-label">計程</div>
-        <div class="lcd-wrap">
-          <span class="ghost cell-lcd">88.8</span>
-          <span class="value cell-lcd" id="distValue">0.0</span>
-        </div>
+        <span class="value cell-lcd" id="distValue">0.0</span>
         <div class="cell-unit">公里</div>
       </div>
       <div class="cell">
         <div class="cell-label">計時（低速等待）</div>
-        <div class="lcd-wrap">
-          <span class="ghost cell-lcd">88:88</span>
-          <span class="value cell-lcd" id="waitValue">00:00</span>
-        </div>
+        <span class="value cell-lcd" id="waitValue">00:00</span>
         <div class="cell-unit">分　秒</div>
       </div>
       <div class="cell">
         <div class="cell-label">通行費</div>
-        <div class="lcd-wrap">
-          <span class="ghost cell-lcd">888</span>
-          <span class="value cell-lcd" id="tollValue">0</span>
-        </div>
+        <span class="value cell-lcd" id="tollValue">0</span>
         <div class="cell-unit">元</div>
       </div>
       <div class="cell">
         <div class="cell-label">夜間</div>
-        <div class="lcd-wrap">
-          <span class="ghost cell-lcd">888</span>
-          <span class="value cell-lcd" id="nightValue">0</span>
-        </div>
+        <span class="value cell-lcd" id="nightValue">0</span>
         <div class="cell-unit">元</div>
       </div>
     </div>
