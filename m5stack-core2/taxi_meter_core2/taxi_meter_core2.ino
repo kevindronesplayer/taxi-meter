@@ -238,21 +238,22 @@ void onRegionTap() {
 }
 
 // ---------------- Drawing ----------------
-void drawButton(const Btn& b, uint16_t bg, bool dim) {
-  M5.Display.fillRect(b.x, b.y, b.w, b.h, bg);
+void drawButton(int idx, uint16_t bg, bool dim) {
+  int x = buttons[idx].x, y = buttons[idx].y, w = buttons[idx].w, h = buttons[idx].h;
+  M5.Display.fillRect(x, y, w, h, bg);
   M5.Display.setTextDatum(top_center);
   M5.Display.setTextColor(dim ? colMuted : colWhite, bg);
   M5.Display.setTextSize(1);
-  M5.Display.drawString(b.l1, b.x + b.w / 2, b.y + 3);
-  M5.Display.drawString(b.l2, b.x + b.w / 2, b.y + 16);
+  M5.Display.drawString(buttons[idx].l1, x + w / 2, y + 3);
+  M5.Display.drawString(buttons[idx].l2, x + w / 2, y + 16);
 }
 
 void drawButtons() {
-  drawButton(buttons[0], colRed, false);
-  drawButton(buttons[1], status == VACANT ? colGreen : colGreenDim, status != VACANT);
-  drawButton(buttons[2], status == RUNNING ? colRedDim : colPanel, status != RUNNING);
-  drawButton(buttons[3], colPanel, status != RUNNING);
-  drawButton(buttons[4], colPanel, false);
+  drawButton(0, colRed, false);
+  drawButton(1, status == VACANT ? colGreen : colGreenDim, status != VACANT);
+  drawButton(2, status == RUNNING ? colRedDim : colPanel, status != RUNNING);
+  drawButton(3, colPanel, status != RUNNING);
+  drawButton(4, colPanel, false);
 }
 
 void drawScreen() {
@@ -366,7 +367,8 @@ void drawReceipt() {
 }
 
 // ---------------- Touch ----------------
-bool pointIn(const Btn& b, int x, int y) {
+bool pointIn(int idx, int x, int y) {
+  Btn& b = buttons[idx];
   return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
 }
 
@@ -379,11 +381,11 @@ void handleTouch() {
     return;
   }
 
-  if (pointIn(buttons[0], t.x, t.y)) { onVacant(); return; }
-  if (pointIn(buttons[1], t.x, t.y)) { onStart(); return; }
-  if (pointIn(buttons[2], t.x, t.y)) { onStop(); return; }
-  if (pointIn(buttons[3], t.x, t.y)) { onHighway(); return; }
-  if (pointIn(buttons[4], t.x, t.y)) { onReceipt(); return; }
+  if (pointIn(0, t.x, t.y)) { onVacant(); return; }
+  if (pointIn(1, t.x, t.y)) { onStart(); return; }
+  if (pointIn(2, t.x, t.y)) { onStop(); return; }
+  if (pointIn(3, t.x, t.y)) { onHighway(); return; }
+  if (pointIn(4, t.x, t.y)) { onReceipt(); return; }
 
   // tap the top-left status area to cycle region while vacant
   if (t.y < 20 && t.x < M5.Display.width() / 2) { onRegionTap(); return; }
