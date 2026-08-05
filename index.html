@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>計程車跳表 🚕 手機版計程車咪錶</title>
+<style>
+  :root{
+    --bezel:#161616;
+    --bezel-2:#0c0c0c;
+    --screen-a:#8fd14f;
+    --screen-b:#5fae2e;
+    --screen-dark-a:#2c3a2c;
+    --screen-dark-b:#1b241b;
+    --ink:#12210c;
+    --ghost:rgba(0,0,0,.18);
+    --red:#c0392b;
+    --red-dim:#5a2019;
+    --amber:#e8b93b;
+    --panel:#1d1d1d;
+    --panel-2:#262626;
+    --text:#eee;
+    --muted:#9a9a9a;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bezel-2);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",system-ui,sans-serif;
+    overscroll-behavior:none;
+    user-select:none;
+  }
+  #app{
+    display:flex;
+    flex-direction:column;
+    min-height:100dvh;
+    padding-top:var(--safe-top);
+    padding-bottom:var(--safe-bottom);
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px;
+    background:var(--bezel);
+  }
+  .brand{ font-size:14px; font-weight:700; color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);}
+  .brand.running .dot{background:var(--red); animation:blink 1s infinite;}
+  @keyframes blink{ 50%{opacity:.25;} }
+  .icon-btn{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--panel-2); border:1px solid #333;
+    color:var(--text); font-size:18px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .icon-btn:active{background:#333;}
+
+  /* ---------- meter screen ---------- */
+  .screen{
+    margin:10px 14px 4px;
+    border-radius:18px;
+    padding:16px 16px 10px;
+    background: radial-gradient(120% 140% at 15% 0%, var(--screen-a), var(--screen-b) 70%);
+    box-shadow: inset 0 0 0 2px rgba(0,0,0,.25), inset 0 12px 30px rgba(0,0,0,.12);
+    color: var(--ink);
+    flex-shrink:0;
+  }
+  .screen.night{
+    background: radial-gradient(120% 140% at 15% 0%, var(--screen-dark-a), var(--screen-dark-b) 70%);
+  }
+  .screen.night .ink{ color:#bfe6a8; }
+  .status-row{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:12px; font-weight:700; opacity:.75; margin-bottom:2px;
+  }
+  .status-pill{
+    padding:2px 9px; border-radius:20px; font-size:11px; font-weight:800;
+    background:rgba(0,0,0,.12);
+  }
+  .status-pill.running{background:rgba(192,57,43,.25); color:#7a1f14;}
+
+  .lcd-wrap{ position:relative; display:inline-grid; }
+  .lcd-wrap > *{ grid-area:1/1; }
+  .ghost{ color:var(--ghost); user-select:none; text-align:right; }
+  .value{ color:var(--ink); font-variant-numeric:tabular-nums; text-align:right; }
+
+  .fare-row{ display:flex; align-items:flex-end; justify-content:space-between; margin:6px 0 2px;}
+  .fare-label{ font-size:13px; font-weight:800; opacity:.7; }
+  .fare-lcd{ font-size:56px; font-weight:800; line-height:1; font-family:'Courier New',monospace; letter-spacing:-1px;}
+  .fare-unit{ font-size:14px; font-weight:700; opacity:.7; margin-left:4px;}
+  .clock-lcd{ font-size:26px; font-weight:800; font-family:'Courier New',monospace; letter-spacing:2px; }
+  .clock-label{ font-size:11px; font-weight:700; opacity:.65; letter-spacing:2px;}
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+  .cell{
+    background:rgba(0,0,0,.06); border-radius:10px; padding:8px 10px;
+  }
+  .cell-label{ font-size:11px; font-weight:800; opacity:.65; }
+  .cell-lcd{ font-size:22px; font-weight:800; font-family:'Courier New',monospace; }
+  .cell-unit{ font-size:11px; font-weight:700; opacity:.6; }
+
+  /* ---------- info strip ---------- */
+  .info-strip{
+    margin:6px 14px 0; padding:8px 12px;
+    background:var(--panel); border-radius:10px;
+    font-size:12px; color:var(--muted); line-height:1.5;
+  }
+  .info-strip b{ color:#d7d7d7; }
+
+  .spacer{ flex:1; }
+
+  /* ---------- control buttons ---------- */
+  .controls{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+    padding:10px 14px calc(10px + var(--safe-bottom));
+    background:var(--bezel);
+  }
+  .btn{
+    border:none; border-radius:12px; padding:14px 6px;
+    background:var(--panel-2); color:var(--text);
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    font-family:inherit;
+  }
+  .btn .k{ font-size:10px; font-weight:700; color:var(--muted); }
+  .btn .t{ font-size:15px; font-weight:800; }
+  .btn:active{ filter:brightness(1.2); }
+  .btn:disabled{ opacity:.35; }
+  .btn.vacant{ background:var(--red); }
+  .btn.vacant .k{ color:#ffd; }
+  .btn.start{ background:#2d6a2d; }
+  .btn.start.rec .t::before{ content:'● '; color:#ff6b5e; }
+  .btn.stop{ background:#5a2019; }
+  .btn.highway{ background:var(--panel-2); }
+  .btn.print{ grid-column: span 1; }
+
+  @media (min-width:560px){
+    .controls{ grid-template-columns:repeat(5,1fr); }
+  }
+
+  /* ---------- landscape / wide layout: dashboard style ---------- */
+  @media (min-width:760px) and (orientation:landscape){
+    #app{ display:block; }
+    .screen{
+      margin:16px; padding:22px 26px;
+      display:grid; grid-template-columns:1fr 1fr; gap:6px 24px;
+      align-items:start;
+    }
+    .fare-row{ grid-column:2; justify-content:flex-end; text-align:right; flex-direction:column; align-items:flex-end;}
+    .clock-block{ grid-column:1; }
+    .grid2{ grid-column:1 / -1; grid-template-columns:repeat(4,1fr); }
+    .controls{ grid-template-columns:repeat(5,1fr); position:sticky; bottom:0; }
+    .fare-lcd{ font-size:72px; }
+  }
+
+  /* ---------- settings modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.55);
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index:50; opacity:0; pointer-events:none; transition:opacity .15s;
+  }
+  .overlay.open{ opacity:1; pointer-events:auto; }
+  .sheet{
+    background:var(--panel); width:100%; max-width:480px;
+    border-radius:18px 18px 0 0; padding:18px 18px calc(18px + var(--safe-bottom));
+    max-height:88vh; overflow:auto;
+    transform:translateY(12px); transition:transform .15s;
+  }
+  .overlay.open .sheet{ transform:translateY(0); }
+  @media (min-width:760px){
+    .overlay{ align-items:center; }
+    .sheet{ border-radius:18px; }
+  }
+  .sheet h2{ margin:0 0 14px; font-size:18px; display:flex; justify-content:space-between; align-items:center;}
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:13px; font-weight:700; color:var(--muted); margin-bottom:6px;}
+  select, .seg{
+    width:100%; padding:10px; border-radius:10px; border:1px solid #3a3a3a;
+    background:var(--panel-2); color:var(--text); font-size:15px; font-family:inherit;
+  }
+  .seg{ display:flex; padding:4px; gap:4px; }
+  .seg button{
+    flex:1; padding:9px 4px; border:none; border-radius:8px; background:transparent; color:var(--text);
+    font-family:inherit; font-size:13px; font-weight:700;
+  }
+  .seg button.active{ background:var(--amber); color:#231a00; }
+  .rate-note{ font-size:12px; color:var(--muted); line-height:1.6; background:var(--panel-2); padding:10px; border-radius:10px;}
+  input[type=range]{ width:100%; }
+  .range-val{ font-size:13px; color:var(--muted); }
+  .close-x{ background:none; border:none; color:var(--muted); font-size:20px; }
+
+  /* ---------- receipt modal ---------- */
+  .receipt{
+    background:#fff; color:#111; border-radius:12px; padding:20px;
+    font-family:'Courier New',monospace; font-size:14px; line-height:1.7;
+  }
+  .receipt hr{ border:none; border-top:1px dashed #999; margin:8px 0;}
+  .receipt .row{ display:flex; justify-content:space-between; }
+  .receipt .total{ font-weight:800; font-size:17px; }
+  .print-actions{ display:flex; gap:10px; margin-top:14px; }
+  .print-actions button{
+    flex:1; padding:12px; border-radius:10px; border:none; font-weight:800; font-size:14px;
+  }
+  .print-actions .go{ background:var(--amber); color:#231a00; }
+  .print-actions .cancel{ background:var(--panel-2); color:var(--text); }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #receiptPrintArea, #receiptPrintArea *{ visibility:visible; }
+    #receiptPrintArea{ position:absolute; top:0; left:0; width:100%; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand" id="brandRow"><span class="dot"></span><span id="statusText">空車待客</span></div>
+    <button class="icon-btn" id="settingsBtn" aria-label="設定">⚙</button>
+  </div>
+
+  <div class="screen" id="screen">
+    <div class="status-row">
+      <span id="regionLabel">雙北（台北/新北）</span>
+      <span class="status-pill" id="modePill">🎮 模擬</span>
+    </div>
+
+    <div class="clock-block">
+      <div class="clock-label">行車時間 時：分：秒</div>
+      <div class="lcd-wrap">
+        <span class="ghost clock-lcd">88:88:88</span>
+        <span class="value clock-lcd" id="tripClock">00:00:00</span>
+      </div>
+    </div>
+
+    <div class="fare-row">
+      <div>
+        <div class="fare-label">車　資</div>
+        <div class="lcd-wrap">
+          <span class="ghost fare-lcd">8888</span>
+          <span class="value fare-lcd" id="fareValue">0</span>
+        </div>
+      </div>
+      <div class="fare-unit">元</div>
+    </div>
+
+    <div class="grid2">
+      <div class="cell">
+        <div class="cell-label">計程</div>
+        <div class="lcd-wrap">
+          <span class="ghost cell-lcd">88.8</span>
+          <span class="value cell-lcd" id="distValue">0.0</span>
+        </div>
+        <div class="cell-unit">公里</div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">計時（低速等待）</div>
+        <div class="lcd-wrap">
+          <span class="ghost cell-lcd">88:88</span>
+          <span class="value cell-lcd" id="waitValue">00:00</span>
+        </div>
+        <div class="cell-unit">分　秒</div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">通行費</div>
+        <div class="lcd-wrap">
+          <span class="ghost cell-lcd">888</span>
+          <span class="value cell-lcd" id="tollValue">0</span>
+        </div>
+        <div class="cell-unit">元</div>
+      </div>
+      <div class="cell">
+        <div class="cell-label">夜間</div>
+        <div class="lcd-wrap">
+          <span class="ghost cell-lcd">888</span>
+          <span class="value cell-lcd" id="nightValue">0</span>
+        </div>
+        <div class="cell-unit">元</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-strip" id="rateNote"></div>
+
+  <div class="spacer"></div>
+
+  <div class="controls">
+    <button class="btn vacant" id="btnVacant"><span class="k">F1</span><span class="t">空</span></button>
+    <button class="btn start" id="btnStart"><span class="k">F2</span><span class="t">計程計時</span></button>
+    <button class="btn stop" id="btnStop"><span class="k">F3</span><span class="t">停</span></button>
+    <button class="btn highway" id="btnHighway"><span class="k">F4</span><span class="t">高速公路</span></button>
+    <button class="btn print" id="btnPrint"><span class="k">F5</span><span class="t">列印</span></button>
+  </div>
+
+</div>
+
+<!-- settings sheet -->
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <h2>設定 <button class="close-x" id="closeSettings">×</button></h2>
+
+    <div class="field">
+      <label>🗺️ 地區費率</label>
+      <select id="regionSelect"></select>
+    </div>
+    <div class="field">
+      <div class="rate-note" id="rateNoteDetail"></div>
+    </div>
+
+    <div class="field">
+      <label>計費模式</label>
+      <div class="seg" id="modeSeg">
+        <button data-mode="sim" class="active">🎮 模擬</button>
+        <button data-mode="gps">📍 GPS</button>
+      </div>
+    </div>
+
+    <div class="field" id="simSpeedField">
+      <label>模擬車速 <span id="simSpeedVal">40</span> km/h</label>
+      <input type="range" id="simSpeed" min="0" max="80" value="40">
+    </div>
+
+    <div class="field">
+      <label>夜間加成</label>
+      <div class="seg" id="nightSeg">
+        <button data-night="auto" class="active">自動</button>
+        <button data-night="on">開</button>
+        <button data-night="off">關</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>🔆 螢幕恆亮</label>
+      <div class="seg" id="wakeSeg">
+        <button data-wake="off" class="active">關</button>
+        <button data-wake="on">開</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>全螢幕</label>
+      <div class="seg"><button id="fullscreenBtn">⛶ 進入 / 離開全螢幕</button></div>
+    </div>
+
+    <div class="rate-note">
+      費率：起跳含前段基本里程（不跳錢）．超過後每 200m 跳錢．低速（時速&lt;5km/h）每段秒數跳等待費．夜間依地區為固定加成或百分比加成．高速公路每按 F4 加收通行費。<br>
+      GPS 模式需允許定位權限，適合實際搭車量測；模擬模式用車速滑桿模擬移動，適合展示與測試。<br>
+      iPhone 加入主畫面：Safari「分享 → 加入主畫面」，開啟後無網址列，體驗更接近原生 App。
+    </div>
+  </div>
+</div>
+
+<!-- receipt sheet -->
+<div class="overlay" id="receiptOverlay">
+  <div class="sheet">
+    <h2>收據預覽 <button class="close-x" id="closeReceipt">×</button></h2>
+    <div class="receipt" id="receiptPrintArea">
+      <div style="text-align:center;font-weight:800;">計程車收據</div>
+      <div style="text-align:center;font-size:12px;" id="rcDate"></div>
+      <hr>
+      <div class="row"><span>地區費率</span><span id="rcRegion"></span></div>
+      <div class="row"><span>行車時間</span><span id="rcTime"></span></div>
+      <div class="row"><span>里程</span><span id="rcDist"></span></div>
+      <div class="row"><span>等待時間</span><span id="rcWait"></span></div>
+      <hr>
+      <div class="row"><span>車資</span><span id="rcFare"></span></div>
+      <div class="row"><span>通行費</span><span id="rcToll"></span></div>
+      <div class="row"><span>夜間加成</span><span id="rcNight"></span></div>
+      <hr>
+      <div class="row total"><span>總計</span><span id="rcTotal"></span></div>
+    </div>
+    <div class="print-actions">
+      <button class="cancel" id="cancelReceipt">關閉</button>
+      <button class="go" id="doPrint">列印</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var REGIONS = {
+    north:    { name:'雙北（台北/新北）', base:85, includedKm:1.25, stepM:200, stepFare:5, waitSec:60,  waitFare:5, night:{type:'flat', amount:20} },
+    taoyuan:  { name:'桃園市',           base:90, includedKm:1.25, stepM:200, stepFare:5, waitSec:80,  waitFare:5, night:null },
+    taichung: { name:'台中市',           base:85, includedKm:1.25, stepM:200, stepFare:5, waitSec:60,  waitFare:5, night:{type:'flat', amount:20} },
+    tainan:   { name:'台南市',           base:85, includedKm:1.25, stepM:200, stepFare:5, waitSec:100, waitFare:5, night:{type:'percent', amount:20} },
+    kaohsiung:{ name:'高雄市',           base:85, includedKm:1.25, stepM:200, stepFare:5, waitSec:100, waitFare:5, night:{type:'percent', amount:20} }
+  };
+  var HIGHWAY_FEE = 40;
+  var WAIT_SPEED_KMH = 5;
+
+  var state = {
+    region: 'north',
+    mode: 'sim',            // sim | gps
+    simSpeed: 40,
+    nightMode: 'auto',      // auto | on | off
+    wake: 'off',
+    status: 'vacant',       // vacant | running | stopped
+    distanceKm: 0,
+    waitingSec: 0,
+    elapsedSec: 0,
+    tollCount: 0,
+    lastSpeedKmh: 0
+  };
+
+  var tickTimer = null;
+  var wakeLock = null;
+  var geoWatchId = null;
+  var lastGeo = null; // {lat,lon,t}
+
+  // ---------- element refs ----------
+  var el = {};
+  ['statusText','brandRow','regionLabel','modePill','tripClock','fareValue','distValue',
+   'waitValue','tollValue','nightValue','rateNote','screen','btnVacant','btnStart','btnStop',
+   'btnHighway','btnPrint','settingsBtn','settingsOverlay','closeSettings','regionSelect',
+   'rateNoteDetail','modeSeg','simSpeedField','simSpeed','simSpeedVal','nightSeg','wakeSeg',
+   'fullscreenBtn','receiptOverlay','closeReceipt','cancelReceipt','doPrint',
+   'rcDate','rcRegion','rcTime','rcDist','rcWait','rcFare','rcToll','rcNight','rcTotal'
+  ].forEach(function(id){ el[id] = document.getElementById(id); });
+
+  // ---------- helpers ----------
+  function fmtHMS(totalSec){
+    totalSec = Math.max(0, Math.floor(totalSec));
+    var h = Math.floor(totalSec/3600);
+    var m = Math.floor((totalSec%3600)/60);
+    var s = totalSec%60;
+    return [h,m,s].map(function(v){ return String(v).padStart(2,'0'); }).join(':');
+  }
+  function fmtMS(totalSec){
+    totalSec = Math.max(0, Math.floor(totalSec));
+    var m = Math.floor(totalSec/60);
+    var s = totalSec%60;
+    return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  }
+  function isNightNow(){
+    var h = new Date().getHours();
+    return (h >= 23 || h < 6);
+  }
+  function haversineKm(lat1,lon1,lat2,lon2){
+    var R = 6371;
+    var dLat = (lat2-lat1) * Math.PI/180;
+    var dLon = (lon2-lon1) * Math.PI/180;
+    var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180) *
+            Math.sin(dLon/2)*Math.sin(dLon/2);
+    var c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R*c;
+  }
+
+  function currentRegion(){ return REGIONS[state.region]; }
+
+  function computeFare(){
+    var r = currentRegion();
+    var overKm = Math.max(0, state.distanceKm - r.includedKm);
+    var distFare = Math.floor((overKm*1000) / r.stepM) * r.stepFare;
+    var waitFare = Math.floor(state.waitingSec / r.waitSec) * r.waitFare;
+    return r.base + distFare + waitFare;
+  }
+  function nightActive(){
+    if (state.nightMode === 'on') return true;
+    if (state.nightMode === 'off') return false;
+    return isNightNow();
+  }
+  function computeNight(fare){
+    var r = currentRegion();
+    if (!r.night || !nightActive()) return 0;
+    if (r.night.type === 'flat') return r.night.amount;
+    return Math.round(fare * r.night.amount / 100);
+  }
+
+  function render(){
+    var r = currentRegion();
+    el.regionLabel.textContent = r.name;
+    el.modePill.textContent = state.mode === 'sim' ? '🎮 模擬' : '📍 GPS';
+
+    var fare = computeFare();
+    var night = computeNight(fare);
+
+    el.tripClock.textContent = fmtHMS(state.elapsedSec);
+    el.fareValue.textContent = fare;
+    el.distValue.textContent = state.distanceKm.toFixed(1);
+    el.waitValue.textContent = fmtMS(state.waitingSec);
+    el.tollValue.textContent = state.tollCount * HIGHWAY_FEE;
+    el.nightValue.textContent = night;
+
+    el.screen.classList.toggle('night', nightActive());
+
+    var statusLabel = { vacant:'空車待客', running:'載客計費中', stopped:'已停車待列印' }[state.status];
+    el.statusText.textContent = statusLabel;
+    el.brandRow.classList.toggle('running', state.status === 'running');
+
+    el.btnStart.classList.toggle('rec', state.status === 'running');
+    el.btnStart.disabled = state.status !== 'vacant';
+    el.btnStop.disabled = state.status !== 'running';
+    el.btnHighway.disabled = state.status !== 'running';
+
+    el.rateNote.innerHTML = rateNoteText(r);
+    el.rateNoteDetail.innerHTML = rateNoteText(r);
+  }
+
+  function rateNoteText(r){
+    var nightTxt = r.night
+      ? (r.night.type === 'flat' ? ('夜間 +$'+r.night.amount) : ('夜間 +'+r.night.amount+'%'))
+      : '無夜間加成';
+    return '起跳 <b>$'+r.base+'</b>（含 '+r.includedKm+'km）· 每 '+r.stepM+'m +$'+r.stepFare+
+      ' · 低速每 '+r.waitSec+'秒 +$'+r.waitFare+' · '+nightTxt+' · 高速公路每按 F4 +$'+HIGHWAY_FEE;
+  }
+
+  // ---------- ticking ----------
+  function startTicking(){
+    stopTicking();
+    tickTimer = setInterval(function(){
+      if (state.status !== 'running') return;
+      state.elapsedSec += 1;
+      if (state.lastSpeedKmh < WAIT_SPEED_KMH) state.waitingSec += 1;
+      if (state.mode === 'sim'){
+        state.distanceKm += state.lastSpeedKmh/3600;
+      }
+      render();
+    }, 1000);
+  }
+  function stopTicking(){
+    if (tickTimer){ clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  // ---------- GPS ----------
+  function startGeo(){
+    if (!('geolocation' in navigator)){
+      alert('此裝置/瀏覽器不支援 GPS 定位。');
+      return;
+    }
+    if (geoWatchId != null) return;
+    geoWatchId = navigator.geolocation.watchPosition(function(pos){
+      var c = pos.coords;
+      var t = pos.timestamp;
+      if (lastGeo){
+        var dtSec = (t - lastGeo.t)/1000;
+        if (dtSec > 0.2){
+          var dKm = haversineKm(lastGeo.lat, lastGeo.lon, c.latitude, c.longitude);
+          var speedKmh = (c.speed != null && !isNaN(c.speed)) ? c.speed*3.6 : (dKm/dtSec*3600);
+          state.lastSpeedKmh = Math.max(0, speedKmh);
+          if (state.status === 'running'){
+            state.distanceKm += dKm;
+          }
+        }
+      }
+      lastGeo = { lat:c.latitude, lon:c.longitude, t:t };
+      render();
+    }, function(err){
+      alert('無法取得 GPS 定位：' + err.message + '\n將維持模擬模式資料。');
+    }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
+  }
+  function stopGeo(){
+    if (geoWatchId != null){
+      navigator.geolocation.clearWatch(geoWatchId);
+      geoWatchId = null;
+    }
+    lastGeo = null;
+  }
+
+  // ---------- wake lock ----------
+  function applyWakeLock(){
+    if (state.wake === 'on' && 'wakeLock' in navigator){
+      navigator.wakeLock.request('screen').then(function(lock){
+        wakeLock = lock;
+      }).catch(function(){ /* ignore */ });
+    } else if (wakeLock){
+      wakeLock.release().catch(function(){});
+      wakeLock = null;
+    }
+  }
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible' && state.wake === 'on') applyWakeLock();
+  });
+
+  // ---------- controls ----------
+  function resetTrip(){
+    state.distanceKm = 0;
+    state.waitingSec = 0;
+    state.elapsedSec = 0;
+    state.tollCount = 0;
+    state.lastSpeedKmh = state.mode === 'sim' ? state.simSpeed : 0;
+  }
+
+  el.btnVacant.addEventListener('click', function(){
+    if (state.status === 'running'){
+      if (!confirm('目前行程進行中，確定要重設為空車嗎？')) return;
+    }
+    state.status = 'vacant';
+    resetTrip();
+    stopTicking();
+    render();
+  });
+
+  el.btnStart.addEventListener('click', function(){
+    if (state.status !== 'vacant') return;
+    resetTrip();
+    state.status = 'running';
+    startTicking();
+    if (state.mode === 'gps') startGeo();
+    render();
+  });
+
+  el.btnStop.addEventListener('click', function(){
+    if (state.status !== 'running') return;
+    state.status = 'stopped';
+    stopTicking();
+    render();
+  });
+
+  el.btnHighway.addEventListener('click', function(){
+    if (state.status !== 'running') return;
+    state.tollCount += 1;
+    render();
+  });
+
+  el.btnPrint.addEventListener('click', openReceipt);
+
+  // ---------- settings sheet ----------
+  Object.keys(REGIONS).forEach(function(key){
+    var opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = REGIONS[key].name;
+    el.regionSelect.appendChild(opt);
+  });
+  el.regionSelect.value = state.region;
+  el.regionSelect.addEventListener('change', function(){
+    state.region = el.regionSelect.value;
+    render();
+  });
+
+  el.settingsBtn.addEventListener('click', function(){ el.settingsOverlay.classList.add('open'); });
+  el.closeSettings.addEventListener('click', function(){ el.settingsOverlay.classList.remove('open'); });
+  el.settingsOverlay.addEventListener('click', function(e){ if (e.target === el.settingsOverlay) el.settingsOverlay.classList.remove('open'); });
+
+  el.modeSeg.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-mode]');
+    if (!btn) return;
+    Array.prototype.forEach.call(el.modeSeg.querySelectorAll('button'), function(b){ b.classList.toggle('active', b===btn); });
+    state.mode = btn.dataset.mode;
+    el.simSpeedField.style.display = state.mode === 'sim' ? '' : 'none';
+    if (state.mode === 'gps'){
+      if (state.status === 'running') startGeo();
+    } else {
+      stopGeo();
+      state.lastSpeedKmh = state.simSpeed;
+    }
+    render();
+  });
+
+  el.simSpeed.addEventListener('input', function(){
+    state.simSpeed = Number(el.simSpeed.value);
+    el.simSpeedVal.textContent = state.simSpeed;
+    if (state.mode === 'sim') state.lastSpeedKmh = state.simSpeed;
+  });
+
+  el.nightSeg.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-night]');
+    if (!btn) return;
+    Array.prototype.forEach.call(el.nightSeg.querySelectorAll('button'), function(b){ b.classList.toggle('active', b===btn); });
+    state.nightMode = btn.dataset.night;
+    render();
+  });
+
+  el.wakeSeg.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-wake]');
+    if (!btn) return;
+    Array.prototype.forEach.call(el.wakeSeg.querySelectorAll('button'), function(b){ b.classList.toggle('active', b===btn); });
+    state.wake = btn.dataset.wake;
+    applyWakeLock();
+  });
+
+  el.fullscreenBtn.addEventListener('click', function(){
+    if (!document.fullscreenElement){
+      document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(function(){});
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+    }
+  });
+
+  // ---------- receipt ----------
+  function openReceipt(){
+    var r = currentRegion();
+    var fare = computeFare();
+    var night = computeNight(fare);
+    var toll = state.tollCount * HIGHWAY_FEE;
+    var total = fare + night + toll;
+
+    el.rcDate.textContent = new Date().toLocaleString('zh-TW');
+    el.rcRegion.textContent = r.name;
+    el.rcTime.textContent = fmtHMS(state.elapsedSec);
+    el.rcDist.textContent = state.distanceKm.toFixed(2) + ' 公里';
+    el.rcWait.textContent = fmtMS(state.waitingSec);
+    el.rcFare.textContent = '$' + fare;
+    el.rcToll.textContent = '$' + toll;
+    el.rcNight.textContent = '$' + night;
+    el.rcTotal.textContent = '$' + total;
+
+    el.receiptOverlay.classList.add('open');
+  }
+  el.closeReceipt.addEventListener('click', function(){ el.receiptOverlay.classList.remove('open'); });
+  el.cancelReceipt.addEventListener('click', function(){ el.receiptOverlay.classList.remove('open'); });
+  el.receiptOverlay.addEventListener('click', function(e){ if (e.target === el.receiptOverlay) el.receiptOverlay.classList.remove('open'); });
+  el.doPrint.addEventListener('click', function(){ window.print(); });
+
+  // ---------- init ----------
+  state.lastSpeedKmh = state.simSpeed;
+  render();
+})();
+</script>
+</body>
+</html>
