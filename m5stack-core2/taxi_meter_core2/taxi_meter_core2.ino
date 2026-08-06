@@ -99,7 +99,11 @@ Region REGIONS[] = {
 };
 const int REGION_COUNT = 5;
 int regionIdx = 0;
-inline Region& currentRegion() { return REGIONS[regionIdx]; }
+// A plain function returning "Region&" trips the same ctags prototype-
+// hoisting bug fixed for Btn below (any sketch-local struct type in a
+// function signature can get its auto-generated prototype inserted
+// above the struct's own definition); a macro sidesteps it entirely.
+#define CURRENT_REGION REGIONS[regionIdx]
 
 const int HIGHWAY_FEE = 40;
 const double WAIT_SPEED_KMH = 5.0;
@@ -170,7 +174,7 @@ void layoutButtons() {
 
 // ---------------- Fare math ----------------
 long computeFare() {
-  Region& r = currentRegion();
+  Region& r = CURRENT_REGION;
   double overKm = distanceKm - r.includedKm;
   if (overKm < 0) overKm = 0;
   long distFare = (long)(overKm * 1000.0 / r.stepM) * r.stepFare;
@@ -179,7 +183,7 @@ long computeFare() {
 }
 
 long computeNight(long fare) {
-  Region& r = currentRegion();
+  Region& r = CURRENT_REGION;
   if (!r.hasNight || !nightNow) return 0;
   if (!r.nightIsPercent) return r.nightAmount;
   return (long)round(fare * r.nightAmount / 100.0);
@@ -341,7 +345,7 @@ void drawScreen() {
   canvas.setTextDatum(top_left);
   canvas.setTextColor(ink, bg);
   canvas.setTextSize(1);
-  canvas.drawString(currentRegion().name, 10, screenY + 6);
+  canvas.drawString(CURRENT_REGION.name, 10, screenY + 6);
 
   char hms[10];
   formatHMS(elapsedSec, hms);
@@ -424,7 +428,7 @@ void drawReceipt() {
   canvas.setTextSize(2);
   canvas.drawString("RECEIPT", x, y); y += lh + 6;
   canvas.setTextSize(1);
-  canvas.drawString(currentRegion().name, x, y); y += lh;
+  canvas.drawString(CURRENT_REGION.name, x, y); y += lh;
   char hms[10]; formatHMS(elapsedSec, hms);
   char line[48];
   sprintf(line, "Trip time: %s", hms); canvas.drawString(line, x, y); y += lh;
