@@ -306,6 +306,19 @@ void drawScreen() {
   canvas.setTextSize(3);
   canvas.drawString(hms, 10, screenY + 26);
 
+  // GPS diagnostics: RX = bytes seen from the module at all, OK = sentences
+  // that parsed with a valid checksum, SAT = satellites currently tracked.
+  // If RX stays 0, no data is arriving (wiring/power/baud); if RX grows but
+  // OK stays 0, data is arriving garbled (wrong baud, or TX/RX swapped); if
+  // OK grows but SAT is 0, the module is fine but can't see enough sky yet.
+  char gdbg[40];
+  sprintf(gdbg, "RX:%lu OK:%lu SAT:%d", (unsigned long)gps.charsProcessed(),
+          (unsigned long)gps.passedChecksum(), (int)gps.satellites.value());
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(ink, bg);
+  canvas.setTextSize(1);
+  canvas.drawString(gdbg, 10, screenY + 54);
+
   // fare, big, right aligned
   char fareBuf[16];
   sprintf(fareBuf, "%ld", computeFare());
