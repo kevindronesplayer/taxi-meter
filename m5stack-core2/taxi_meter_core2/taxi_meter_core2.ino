@@ -39,8 +39,42 @@
 // ---------------- GPS ----------------
 static const int GPS_RX_PIN = 33; // Port A: Core2 RX <- GPS TX
 static const int GPS_TX_PIN = 32; // Port A: Core2 TX -> GPS RX (unused, we never write to the GPS)
-static const uint32_t GPS_BAUD = 9600;
 TinyGPSPlus gps;
+
+// Lots of bytes arriving but essentially none of them forming a sentence
+// that passes its checksum (RX in the tens of thousands, OK stuck at 0)
+// means the byte stream itself isn't framed as 9600-baud NMEA text, even
+// though that's the module's documented default. Rather than guess once
+// and require another flash-and-wait cycle, cycle through common GNSS
+// baud rates automatically and lock onto whichever one actually parses.
+const uint32_t BAUD_CANDIDATES[] = { 9600, 115200, 4800, 38400, 57600 };
+const int BAUD_CANDIDATE_COUNT = 5;
+const unsigned long BAUD_TRY_MS = 4000; // give each candidate 4s to prove itself
+int baudIdx = 0;
+bool baudLocked = false;
+unsigned long baudTryStart = 0;
+unsigned long passedAtBaudStart = 0;
+
+void beginGpsSerial(int idx) {
+  Serial2.end();
+  delay(20);
+  Serial2.setRxBufferSize(1024);
+  Serial2.begin(BAUD_CANDIDATES[idx], SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  baudTryStart = millis();
+  passedAtBaudStart = gps.passedChecksum();
+}
+
+void gpsAutoBaud() {
+  if (baudLocked) return;
+  if (gps.passedChecksum() > passedAtBaudStart) {
+    baudLocked = true;
+    return;
+  }
+  if (millis() - baudTryStart > BAUD_TRY_MS) {
+    baudIdx = (baudIdx + 1) % BAUD_CANDIDATE_COUNT;
+    beginGpsSerial(baudIdx);
+  }
+}
 
 // ---------------- Fare regions ----------------
 struct Region {
@@ -177,6 +211,7 @@ void gpsTick() {
     gps.encode(Serial2.read());
   }
 
+  gpsAutoBaud();
   updateNightFromGps();
 
   if (!gps.location.isUpdated() || !gps.location.isValid()) return;
@@ -313,15 +348,16 @@ void drawScreen() {
   canvas.setTextSize(3);
   canvas.drawString(hms, 10, screenY + 26);
 
-  // GPS diagnostics: RX = bytes seen from the module at all, OK = sentences
-  // that parsed with a valid checksum, FAIL = sentences with a checksum
-  // mismatch (garbled), SAT = satellites currently tracked. RX growing
-  // with OK stuck and FAIL climbing means bytes are arriving corrupted --
-  // usually a noisy/loose wire, not a baud or pin problem.
-  char gdbg[48];
-  sprintf(gdbg, "RX:%lu OK:%lu FAIL:%lu SAT:%d", (unsigned long)gps.charsProcessed(),
-          (unsigned long)gps.passedChecksum(), (unsigned long)gps.failedChecksum(),
-          (int)gps.satellites.value());
+  // GPS diagnostics: B = baud currently in use ("*" once a sentence has
+  // actually passed checksum at that rate, "?" while still probing other
+  // rates), RX = bytes seen from the module at all, OK = sentences that
+  // parsed with a valid checksum, FAIL = sentences with a checksum
+  // mismatch (garbled), SAT = satellites currently tracked.
+  char gdbg[64];
+  sprintf(gdbg, "B:%lu%s RX:%lu OK:%lu FAIL:%lu SAT:%d",
+          (unsigned long)BAUD_CANDIDATES[baudIdx], baudLocked ? "*" : "?",
+          (unsigned long)gps.charsProcessed(), (unsigned long)gps.passedChecksum(),
+          (unsigned long)gps.failedChecksum(), (int)gps.satellites.value());
   canvas.setTextDatum(top_left);
   canvas.setTextColor(ink, bg);
   canvas.setTextSize(1);
@@ -443,8 +479,7 @@ void setup() {
   canvas.createSprite(M5.Display.width(), M5.Display.height());
   canvas.fillSprite(colBg);
 
-  Serial2.setRxBufferSize(1024); // headroom in case a draw call briefly delays draining
-  Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  beginGpsSerial(baudIdx);
 
   lastSecondMillis = millis();
   drawScreen();
