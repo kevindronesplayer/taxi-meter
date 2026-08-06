@@ -314,13 +314,14 @@ void drawScreen() {
   canvas.drawString(hms, 10, screenY + 26);
 
   // GPS diagnostics: RX = bytes seen from the module at all, OK = sentences
-  // that parsed with a valid checksum, SAT = satellites currently tracked.
-  // If RX stays 0, no data is arriving (wiring/power/baud); if RX grows but
-  // OK stays 0, data is arriving garbled (wrong baud, or TX/RX swapped); if
-  // OK grows but SAT is 0, the module is fine but can't see enough sky yet.
-  char gdbg[40];
-  sprintf(gdbg, "RX:%lu OK:%lu SAT:%d", (unsigned long)gps.charsProcessed(),
-          (unsigned long)gps.passedChecksum(), (int)gps.satellites.value());
+  // that parsed with a valid checksum, FAIL = sentences with a checksum
+  // mismatch (garbled), SAT = satellites currently tracked. RX growing
+  // with OK stuck and FAIL climbing means bytes are arriving corrupted --
+  // usually a noisy/loose wire, not a baud or pin problem.
+  char gdbg[48];
+  sprintf(gdbg, "RX:%lu OK:%lu FAIL:%lu SAT:%d", (unsigned long)gps.charsProcessed(),
+          (unsigned long)gps.passedChecksum(), (unsigned long)gps.failedChecksum(),
+          (int)gps.satellites.value());
   canvas.setTextDatum(top_left);
   canvas.setTextColor(ink, bg);
   canvas.setTextSize(1);
@@ -438,6 +439,7 @@ void setup() {
   canvas.createSprite(M5.Display.width(), M5.Display.height());
   canvas.fillSprite(colBg);
 
+  Serial2.setRxBufferSize(1024); // headroom in case a draw call briefly delays draining
   Serial2.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
 
   lastSecondMillis = millis();
