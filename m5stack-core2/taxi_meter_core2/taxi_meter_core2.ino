@@ -336,9 +336,12 @@ void drawScreen() {
   canvas.setTextSize(6);
   canvas.drawString(fareBuf, w - 14, screenY + 16);
 
-  // four mini cells
-  int cellY = screenY + 70;
-  int cellW = (w - 16) / 4;
+  // four mini cells, 2x2 grid -- a single row of 4 didn't leave enough
+  // width per cell for a size-3 "00:00"-style value, so WAIT's digits
+  // were spilling into TOLL's slot.
+  int cellY = screenY + 68;
+  int colW = (w - 16) / 2;
+  int rowH = 38;
   const char* labels[4] = { "DIST km", "WAIT", "TOLL", "NIGHT" };
   char v0[8], v1[8], v2[8], v3[8];
   sprintf(v0, "%.1f", distanceKm);
@@ -348,13 +351,14 @@ void drawScreen() {
   const char* vals[4] = { v0, v1, v2, v3 };
 
   for (int i = 0; i < 4; i++) {
-    int cx = 8 + i * cellW;
+    int cx = 8 + (i % 2) * colW;
+    int cy = cellY + (i / 2) * rowH;
     canvas.setTextDatum(top_left);
     canvas.setTextColor(ink, bg);
     canvas.setTextSize(1);
-    canvas.drawString(labels[i], cx, cellY);
+    canvas.drawString(labels[i], cx, cy);
     canvas.setTextSize(3);
-    canvas.drawString(vals[i], cx, cellY + 12);
+    canvas.drawString(vals[i], cx, cy + 12);
   }
 
   if (resetArmedAt != 0 && status == RUNNING) {
