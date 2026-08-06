@@ -222,7 +222,7 @@
   <div class="screen" id="screen">
     <div class="status-row">
       <span id="regionLabel">雙北（台北/新北）</span>
-      <span class="status-pill" id="modePill">🎮 模擬</span>
+      <span class="status-pill" id="modePill">📍 GPS</span>
     </div>
 
     <div class="clock-block">
@@ -292,12 +292,12 @@
     <div class="field">
       <label>計費模式</label>
       <div class="seg" id="modeSeg">
-        <button data-mode="sim" class="active">🎮 模擬</button>
-        <button data-mode="gps">📍 GPS</button>
+        <button data-mode="sim">🎮 模擬</button>
+        <button data-mode="gps" class="active">📍 GPS</button>
       </div>
     </div>
 
-    <div class="field" id="simSpeedField">
+    <div class="field" id="simSpeedField" style="display:none">
       <label>模擬車速 <span id="simSpeedVal">40</span> km/h</label>
       <input type="range" id="simSpeed" min="0" max="80" value="40">
     </div>
@@ -374,7 +374,7 @@
 
   var state = {
     region: 'north',
-    mode: 'sim',            // sim | gps
+    mode: 'gps',            // sim | gps
     simSpeed: 40,
     nightMode: 'auto',      // auto | on | off
     wake: 'off',
@@ -520,10 +520,20 @@
         var dtSec = (t - lastGeo.t)/1000;
         if (dtSec > 0){
           var dKm = haversineKm(lastGeo.lat, lastGeo.lon, c.latitude, c.longitude);
-          var speedKmh = (c.speed != null && !isNaN(c.speed)) ? c.speed*3.6 : (dKm/dtSec*3600);
-          state.lastSpeedKmh = Math.max(0, speedKmh);
           if (state.status === 'running'){
             state.distanceKm += dKm;
+          }
+          // Speed feeds the low-speed "waiting" timer, so it needs a stable
+          // estimate: trust the device's own speed reading when available;
+          // otherwise only derive it from distance/time when dtSec is large
+          // enough that GPS jitter won't swing it wildly (a rapid duplicate
+          // fix with dtSec near 0 would otherwise read as "stopped" even
+          // while actually driving). If neither is reliable yet, just keep
+          // the last known speed instead of guessing.
+          if (c.speed != null && !isNaN(c.speed)){
+            state.lastSpeedKmh = Math.max(0, c.speed*3.6);
+          } else if (dtSec > 0.3){
+            state.lastSpeedKmh = Math.max(0, dKm/dtSec*3600);
           }
         }
       }
@@ -687,7 +697,7 @@
   el.doPrint.addEventListener('click', function(){ window.print(); });
 
   // ---------- init ----------
-  state.lastSpeedKmh = state.simSpeed;
+  if (state.mode === 'sim') state.lastSpeedKmh = state.simSpeed;
   render();
 })();
 </script>
