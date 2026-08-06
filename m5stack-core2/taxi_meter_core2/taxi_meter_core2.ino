@@ -352,21 +352,6 @@ void drawScreen() {
   canvas.setTextSize(3);
   canvas.drawString(hms, 10, screenY + 26);
 
-  // GPS diagnostics: B = baud currently in use ("*" once a sentence has
-  // actually passed checksum at that rate, "?" while still probing other
-  // rates), RX = bytes seen from the module at all, OK = sentences that
-  // parsed with a valid checksum, FAIL = sentences with a checksum
-  // mismatch (garbled), SAT = satellites currently tracked.
-  char gdbg[64];
-  sprintf(gdbg, "B:%lu%s RX:%lu OK:%lu FAIL:%lu SAT:%d",
-          (unsigned long)BAUD_CANDIDATES[baudIdx], baudLocked ? "*" : "?",
-          (unsigned long)gps.charsProcessed(), (unsigned long)gps.passedChecksum(),
-          (unsigned long)gps.failedChecksum(), (int)gps.satellites.value());
-  canvas.setTextDatum(top_left);
-  canvas.setTextColor(ink, bg);
-  canvas.setTextSize(1);
-  canvas.drawString(gdbg, 10, screenY + 54);
-
   // fare, big, right aligned
   char fareBuf[16];
   sprintf(fareBuf, "%ld", computeFare());
@@ -375,13 +360,33 @@ void drawScreen() {
   canvas.drawString("FARE", w - 14, screenY + 4);
   canvas.setTextSize(6);
   canvas.drawString(fareBuf, w - 14, screenY + 16);
+  // fare can grow to several digits on a long trip, at which point its
+  // size-6 digits reach a long way left -- keep anything else out of the
+  // y=16..64 band entirely instead of guessing how far they'll reach.
+
+  // GPS diagnostics: B = baud currently in use ("*" once a sentence has
+  // actually passed checksum at that rate, "?" while still probing other
+  // rates), RX = bytes seen from the module at all, OK = sentences that
+  // parsed with a valid checksum, FAIL = sentences with a checksum
+  // mismatch (garbled), SAT = satellites currently tracked. Drawn below
+  // the fare row (not beside it) so a wide fare number can never paint
+  // over it.
+  char gdbg[64];
+  sprintf(gdbg, "B:%lu%s RX:%lu OK:%lu FAIL:%lu SAT:%d",
+          (unsigned long)BAUD_CANDIDATES[baudIdx], baudLocked ? "*" : "?",
+          (unsigned long)gps.charsProcessed(), (unsigned long)gps.passedChecksum(),
+          (unsigned long)gps.failedChecksum(), (int)gps.satellites.value());
+  canvas.setTextDatum(top_left);
+  canvas.setTextColor(ink, bg);
+  canvas.setTextSize(1);
+  canvas.drawString(gdbg, 10, screenY + 66);
 
   // four mini cells, 2x2 grid -- a single row of 4 didn't leave enough
   // width per cell for a size-3 "00:00"-style value, so WAIT's digits
   // were spilling into TOLL's slot.
-  int cellY = screenY + 68;
+  int cellY = screenY + 78;
   int colW = (w - 16) / 2;
-  int rowH = 38;
+  int rowH = 36;
   const char* labels[4] = { "DIST km", "WAIT", "TOLL", "NIGHT" };
   char v0[8], v1[8], v2[8], v3[8];
   sprintf(v0, "%.1f", distanceKm);
