@@ -1,9 +1,16 @@
 /*
-  Taxi meter firmware for M5Stack Core2 with a GPS unit (AT6558D, e.g.
-  M5Stack "Mini GPS/BDS Unit") on Port C.
+  Taxi meter firmware for M5Stack Core2 with a GPS unit (AT6668, M5Stack
+  "GPS Unit v1.1") wired to Port A.
 
-  Wiring: GPS unit -> Port C (Grove UART). Core2 RX (GPIO13) <- GPS TX,
-  Core2 TX (GPIO14) -> GPS RX. 9600 baud, standard NMEA output.
+  Port A is normally I2C (SDA/SCL), but on Core2 it's just two plain
+  GPIOs (G32/G33) behind a Grove connector, and the GPS unit only cares
+  about its own TX/RX lines, not I2C semantics -- so it works fine there
+  as a UART, it just needs the sketch pointed at G32/G33 instead of the
+  official UART Port C (G13/G14). 9600 baud, standard NMEA output.
+
+  If the on-screen "RX:" counter stays 0, the Grove cable's two signal
+  wires may be swapped relative to what this sketch expects -- try
+  swapping GPS_RX_PIN/GPS_TX_PIN below before assuming it's a dead unit.
 
   Libraries (install via Arduino Library Manager):
     - M5Unified
@@ -30,8 +37,8 @@
 #include <string.h>
 
 // ---------------- GPS ----------------
-static const int GPS_RX_PIN = 13; // Port C: Core2 RX <- GPS TX
-static const int GPS_TX_PIN = 14; // Port C: Core2 TX -> GPS RX
+static const int GPS_RX_PIN = 32; // Port A: Core2 RX <- GPS TX
+static const int GPS_TX_PIN = 33; // Port A: Core2 TX -> GPS RX
 static const uint32_t GPS_BAUD = 9600;
 TinyGPSPlus gps;
 
