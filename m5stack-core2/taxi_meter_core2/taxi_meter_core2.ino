@@ -37,8 +37,8 @@
 #include <string.h>
 
 // ---------------- GPS ----------------
-static const int GPS_RX_PIN = 32; // Port A: Core2 RX <- GPS TX
-static const int GPS_TX_PIN = 33; // Port A: Core2 TX -> GPS RX
+static const int GPS_RX_PIN = 33; // Port A: Core2 RX <- GPS TX
+static const int GPS_TX_PIN = 32; // Port A: Core2 TX -> GPS RX (unused, we never write to the GPS)
 static const uint32_t GPS_BAUD = 9600;
 TinyGPSPlus gps;
 
