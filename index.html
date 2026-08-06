@@ -518,7 +518,7 @@
       var t = pos.timestamp;
       if (lastGeo){
         var dtSec = (t - lastGeo.t)/1000;
-        if (dtSec > 0.2){
+        if (dtSec > 0){
           var dKm = haversineKm(lastGeo.lat, lastGeo.lon, c.latitude, c.longitude);
           var speedKmh = (c.speed != null && !isNaN(c.speed)) ? c.speed*3.6 : (dKm/dtSec*3600);
           state.lastSpeedKmh = Math.max(0, speedKmh);
