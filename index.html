@@ -222,7 +222,10 @@
   <div class="screen" id="screen">
     <div class="status-row">
       <span id="regionLabel">雙北（台北/新北）</span>
-      <span class="status-pill" id="modePill">📍 GPS</span>
+      <span>
+        <span class="status-pill" id="gpsStatusPill" style="display:none"></span>
+        <span class="status-pill" id="modePill">📍 GPS</span>
+      </span>
     </div>
 
     <div class="clock-block">
@@ -390,10 +393,13 @@
   var wakeLock = null;
   var geoWatchId = null;
   var lastGeo = null; // {lat,lon,t}
+  var gpsState = 'idle'; // idle | locating | ok | error
+  var gpsErrorText = '';
+  var geoErrorAlerted = false;
 
   // ---------- element refs ----------
   var el = {};
-  ['statusText','brandRow','regionLabel','modePill','tripClock','fareValue','distValue',
+  ['statusText','brandRow','regionLabel','modePill','gpsStatusPill','tripClock','fareValue','distValue',
    'waitValue','tollValue','nightValue','rateNote','screen','btnVacant','btnStart','btnStop',
    'btnHighway','btnPrint','settingsBtn','settingsOverlay','closeSettings','regionSelect',
    'rateNoteDetail','modeSeg','simSpeedField','simSpeed','simSpeedVal','nightSeg','wakeSeg',
@@ -456,6 +462,15 @@
     el.regionLabel.textContent = r.name;
     el.modePill.textContent = state.mode === 'sim' ? '🎮 模擬' : '📍 GPS';
 
+    if (state.mode === 'gps'){
+      var gpsLabel = { idle:'尚未啟動', locating:'🛰️ 定位中…', ok:'✅ 已定位', error:'⚠️ ' + gpsErrorText }[gpsState];
+      el.gpsStatusPill.textContent = gpsLabel;
+      el.gpsStatusPill.style.display = '';
+      el.gpsStatusPill.style.background = gpsState === 'error' ? 'rgba(192,57,43,.35)' : (gpsState === 'ok' ? 'rgba(45,106,45,.35)' : 'rgba(0,0,0,.12)');
+    } else {
+      el.gpsStatusPill.style.display = 'none';
+    }
+
     var fare = computeFare();
     var night = computeNight(fare);
 
@@ -507,12 +522,27 @@
   }
 
   // ---------- GPS ----------
+  function geoErrorText(err){
+    var hint = {
+      1: '定位權限被拒絕，請到瀏覽器/系統設定允許此網站使用位置資訊',
+      2: '目前無法取得定位，請確認裝置定位服務已開啟、且在室外訊號較好的地方',
+      3: '定位逾時，訊號可能太弱，移到室外空曠處再試'
+    }[err.code] || err.message;
+    return '(' + err.code + ') ' + hint;
+  }
+
   function startGeo(){
     if (!('geolocation' in navigator)){
+      gpsState = 'error';
+      gpsErrorText = '此裝置/瀏覽器不支援 GPS 定位';
       alert('此裝置/瀏覽器不支援 GPS 定位。');
+      render();
       return;
     }
     if (geoWatchId != null) return;
+    gpsState = 'locating';
+    geoErrorAlerted = false;
+    render();
     geoWatchId = navigator.geolocation.watchPosition(function(pos){
       var c = pos.coords;
       var t = pos.timestamp;
@@ -538,9 +568,16 @@
         }
       }
       lastGeo = { lat:c.latitude, lon:c.longitude, t:t };
+      gpsState = 'ok';
       render();
     }, function(err){
-      alert('無法取得 GPS 定位：' + err.message + '\n將維持模擬模式資料。');
+      gpsState = 'error';
+      gpsErrorText = geoErrorText(err);
+      if (!geoErrorAlerted){
+        geoErrorAlerted = true;
+        alert('無法取得 GPS 定位：' + gpsErrorText + '\n畫面上方會持續顯示目前定位狀態，之後同類錯誤不會再彈窗。');
+      }
+      render();
     }, { enableHighAccuracy:true, maximumAge:1000, timeout:10000 });
   }
   function stopGeo(){
@@ -549,6 +586,7 @@
       geoWatchId = null;
     }
     lastGeo = null;
+    gpsState = 'idle';
   }
 
   // ---------- wake lock ----------
