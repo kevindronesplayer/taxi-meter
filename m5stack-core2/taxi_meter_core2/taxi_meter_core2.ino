@@ -122,6 +122,9 @@ bool nightNow = false;
 long lastPayable = -1; // -1 = not initialized yet, skip the beep on the next check
 bool soundEnabled = true;
 
+unsigned long powerHoldStart = 0; // 0 = not currently holding
+const unsigned long POWER_HOLD_MS = 1800; // press-and-hold the top bar this long to power off
+
 bool haveLastFix = false;
 double lastLat = 0, lastLng = 0;
 
@@ -395,6 +398,20 @@ void drawScreen() {
   canvas.setTextColor(soundEnabled ? colGreen : colMuted, colBg);
   canvas.drawString(soundEnabled ? "SND ON" : "SND OFF", w - 4 - battW - 10 - fixW - 10, 5);
 
+  // holding the top bar to power off: paint a filling progress bar over it
+  // so it's obvious it's registering, right up until the screen goes dark
+  if (powerHoldStart != 0) {
+    unsigned long held = millis() - powerHoldStart;
+    int fillW = (int)(held * (long)w / POWER_HOLD_MS);
+    if (fillW > w) fillW = w;
+    canvas.fillRect(0, 0, w, topH, colRedDim);
+    canvas.fillRect(0, 0, fillW, topH, colRed);
+    canvas.setTextDatum(top_center);
+    canvas.setTextColor(colWhite, colRed);
+    canvas.setTextSize(1);
+    canvas.drawString("HOLD TO POWER OFF", w / 2, 5);
+  }
+
   // main LCD-style panel
   canvas.fillRoundRect(2, screenY, w - 4, screenH, 8, bg);
 
@@ -514,6 +531,21 @@ bool pointIn(int idx, int x, int y) {
 
 void handleTouch() {
   auto t = M5.Touch.getDetail();
+
+  // Press-and-hold anywhere on the top bar to power off -- the physical
+  // side button needs an awkward long-press too, so this mirrors that
+  // instead of firing on a plain tap (which the region/sound taps below
+  // already use, and which would be far too easy to hit by accident for
+  // something this hard to undo).
+  if (t.isPressed() && t.y < 20) {
+    if (powerHoldStart == 0) powerHoldStart = millis();
+    if (millis() - powerHoldStart >= POWER_HOLD_MS) {
+      M5.Power.powerOff();
+    }
+  } else {
+    powerHoldStart = 0;
+  }
+
   if (!t.wasPressed()) return;
 
   if (showingReceipt) {
