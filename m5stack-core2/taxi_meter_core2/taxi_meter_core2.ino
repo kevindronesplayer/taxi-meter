@@ -115,7 +115,8 @@ Status status = VACANT;
 double distanceKm = 0;
 unsigned long waitingSec = 0;
 unsigned long elapsedSec = 0;
-int tollCount = 0;
+bool highwayActive = false;
+long tollTotal = 0;
 double lastSpeedKmh = 0;
 bool nightNow = false;
 long lastPayable = -1; // -1 = not initialized yet, skip the beep on the next check
@@ -192,7 +193,7 @@ long computeNight(long fare) {
 
 long computeTotalPayable() {
   long fare = computeFare();
-  return fare + computeNight(fare) + (long)tollCount * HIGHWAY_FEE;
+  return fare + computeNight(fare) + tollTotal;
 }
 
 // Real meters click/beep every time the total jumps -- distance, waiting
@@ -261,7 +262,8 @@ void resetTrip() {
   distanceKm = 0;
   waitingSec = 0;
   elapsedSec = 0;
-  tollCount = 0;
+  highwayActive = false;
+  tollTotal = 0;
   resetArmedAt = 0;
   lastPayable = -1;
 }
@@ -294,7 +296,10 @@ void onStop() {
 
 void onHighway() {
   if (status != RUNNING) return;
-  tollCount++;
+  highwayActive = !highwayActive;
+  if (highwayActive) {
+    tollTotal += HIGHWAY_FEE; // charged once on entry, as a flat estimate -- not the real toll
+  }
 }
 
 bool showingReceipt = false;
@@ -320,10 +325,12 @@ void drawButton(int idx, uint16_t bg, bool dim) {
 }
 
 void drawButtons() {
+  buttons[3].l2 = highwayActive ? "HWY ON" : "HWY +40";
+
   drawButton(0, colRed, false);
   drawButton(1, status == VACANT ? colGreen : colGreenDim, status != VACANT);
   drawButton(2, status == RUNNING ? colRedDim : colPanel, status != RUNNING);
-  drawButton(3, colPanel, status != RUNNING);
+  drawButton(3, highwayActive ? colAmber : colPanel, status != RUNNING);
   drawButton(4, colPanel, false);
 }
 
@@ -410,7 +417,7 @@ void drawScreen() {
   char v0[8], v1[8], v2[8], v3[8];
   sprintf(v0, "%.1f", distanceKm);
   formatMS(waitingSec, v1);
-  sprintf(v2, "%d", tollCount * HIGHWAY_FEE);
+  sprintf(v2, "%ld", tollTotal);
   sprintf(v3, "%ld", computeNight(computeFare()));
   const char* vals[4] = { v0, v1, v2, v3 };
 
@@ -443,7 +450,7 @@ void drawReceipt() {
 
   long fare = computeFare();
   long night = computeNight(fare);
-  long toll = tollCount * HIGHWAY_FEE;
+  long toll = tollTotal;
   long total = fare + night + toll;
 
   int x = 34, y = 32, lh = 18;

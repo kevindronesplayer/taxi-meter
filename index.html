@@ -132,6 +132,8 @@
   .btn.start.rec .t::before{ content:'● '; color:#ff6b5e; }
   .btn.stop{ background:#5a2019; }
   .btn.highway{ background:var(--panel-2); }
+  .btn.highway.active{ background:var(--amber); }
+  .btn.highway.active .k, .btn.highway.active .t{ color:#231a00; }
   .btn.print{ grid-column: span 1; }
 
   @media (min-width:560px){
@@ -385,7 +387,8 @@
     distanceKm: 0,
     waitingSec: 0,
     elapsedSec: 0,
-    tollCount: 0,
+    highwayActive: false,
+    tollTotal: 0,
     lastSpeedKmh: 0
   };
 
@@ -478,7 +481,7 @@
     el.fareValue.textContent = fare;
     el.distValue.textContent = state.distanceKm.toFixed(1);
     el.waitValue.textContent = fmtMS(state.waitingSec);
-    el.tollValue.textContent = state.tollCount * HIGHWAY_FEE;
+    el.tollValue.textContent = state.tollTotal;
     el.nightValue.textContent = night;
 
     el.screen.classList.toggle('night', nightActive());
@@ -491,6 +494,8 @@
     el.btnStart.disabled = state.status !== 'vacant';
     el.btnStop.disabled = state.status !== 'running';
     el.btnHighway.disabled = state.status !== 'running';
+    el.btnHighway.classList.toggle('active', state.highwayActive);
+    el.btnHighway.querySelector('.t').textContent = state.highwayActive ? '高速公路中' : '高速公路';
 
     el.rateNote.innerHTML = rateNoteText(r);
     el.rateNoteDetail.innerHTML = rateNoteText(r);
@@ -501,7 +506,7 @@
       ? (r.night.type === 'flat' ? ('夜間 +$'+r.night.amount) : ('夜間 +'+r.night.amount+'%'))
       : '無夜間加成';
     return '起跳 <b>$'+r.base+'</b>（含 '+r.includedKm+'km）· 每 '+r.stepM+'m +$'+r.stepFare+
-      ' · 低速每 '+r.waitSec+'秒 +$'+r.waitFare+' · '+nightTxt+' · 高速公路每按 F4 +$'+HIGHWAY_FEE;
+      ' · 低速每 '+r.waitSec+'秒 +$'+r.waitFare+' · '+nightTxt+' · F4 切換上/下高速公路，上高速公路時收 $'+HIGHWAY_FEE+'（估計值)';
   }
 
   // ---------- ticking ----------
@@ -609,7 +614,8 @@
     state.distanceKm = 0;
     state.waitingSec = 0;
     state.elapsedSec = 0;
-    state.tollCount = 0;
+    state.highwayActive = false;
+    state.tollTotal = 0;
     state.lastSpeedKmh = state.mode === 'sim' ? state.simSpeed : 0;
   }
 
@@ -641,7 +647,10 @@
 
   el.btnHighway.addEventListener('click', function(){
     if (state.status !== 'running') return;
-    state.tollCount += 1;
+    state.highwayActive = !state.highwayActive;
+    if (state.highwayActive){
+      state.tollTotal += HIGHWAY_FEE; // charged once on entry as a flat estimate, not the real toll
+    }
     render();
   });
 
@@ -714,7 +723,7 @@
     var r = currentRegion();
     var fare = computeFare();
     var night = computeNight(fare);
-    var toll = state.tollCount * HIGHWAY_FEE;
+    var toll = state.tollTotal;
     var total = fare + night + toll;
 
     el.rcDate.textContent = new Date().toLocaleString('zh-TW');
