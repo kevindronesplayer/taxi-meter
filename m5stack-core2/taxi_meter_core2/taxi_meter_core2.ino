@@ -120,6 +120,7 @@ long tollTotal = 0;
 double lastSpeedKmh = 0;
 bool nightNow = false;
 long lastPayable = -1; // -1 = not initialized yet, skip the beep on the next check
+bool soundEnabled = true;
 
 bool haveLastFix = false;
 double lastLat = 0, lastLng = 0;
@@ -202,7 +203,7 @@ long computeTotalPayable() {
 // than waiting for the next screen redraw.
 void checkFareBeep() {
   long total = computeTotalPayable();
-  if (lastPayable >= 0 && total > lastPayable) {
+  if (lastPayable >= 0 && total > lastPayable && soundEnabled) {
     M5.Speaker.tone(2200, 90);
   }
   lastPayable = total;
@@ -227,6 +228,18 @@ void updateNightFromGps() {
   int utcHour = gps.time.hour();
   int localHour = (utcHour + 8) % 24; // Taiwan = UTC+8
   nightNow = (localHour >= 23 || localHour < 6);
+}
+
+// There's no RTC set on this board and no network time, so GPS's own UTC
+// time (already used above for the night-surcharge check) doubles as the
+// only real-world clock source. Shows "--:--:--" until GPS provides one.
+void formatLocalTimeFromGps(char* buf) {
+  if (!gps.time.isValid()) {
+    strcpy(buf, "--:--:--");
+    return;
+  }
+  int localHour = (gps.time.hour() + 8) % 24; // Taiwan = UTC+8
+  sprintf(buf, "%02d:%02d:%02d", localHour, gps.time.minute(), gps.time.second());
 }
 
 void gpsTick() {
@@ -313,6 +326,10 @@ void onRegionTap() {
   regionIdx = (regionIdx + 1) % REGION_COUNT;
 }
 
+void onSoundTap() {
+  soundEnabled = !soundEnabled;
+}
+
 // ---------------- Drawing ----------------
 void drawButton(int idx, uint16_t bg, bool dim) {
   int x = buttons[idx].x, y = buttons[idx].y, w = buttons[idx].w, h = buttons[idx].h;
@@ -350,6 +367,14 @@ void drawScreen() {
   canvas.setTextSize(1);
   const char* statusLabel = status == VACANT ? "VACANT" : (status == RUNNING ? "ON TRIP" : "STOPPED");
   canvas.drawString(statusLabel, 4, 5);
+  int statusW = canvas.textWidth(statusLabel);
+
+  // current time, from GPS's own UTC clock (the only real-time source this
+  // board has) -- also doubles as a way to see why night mode did/didn't
+  // kick in, since that's judged off the same clock.
+  char nowBuf[10];
+  formatLocalTimeFromGps(nowBuf);
+  canvas.drawString(nowBuf, 4 + statusW + 10, 5);
 
   // battery %, pinned to the very top-right corner
   int batt = M5.Power.getBatteryLevel();
@@ -364,6 +389,11 @@ void drawScreen() {
   bool fix = gps.location.isValid();
   canvas.setTextColor(fix ? colGreen : colRed, colBg);
   canvas.drawString(fix ? "GPS FIX" : "NO FIX", w - 4 - battW - 10, 5);
+  int fixW = canvas.textWidth(fix ? "GPS FIX" : "NO FIX");
+
+  // sound on/off -- tapping anywhere in the right half of this bar toggles it
+  canvas.setTextColor(soundEnabled ? colGreen : colMuted, colBg);
+  canvas.drawString(soundEnabled ? "SND ON" : "SND OFF", w - 4 - battW - 10 - fixW - 10, 5);
 
   // main LCD-style panel
   canvas.fillRoundRect(2, screenY, w - 4, screenH, 8, bg);
@@ -499,6 +529,8 @@ void handleTouch() {
 
   // tap the top-left status area to cycle region while vacant
   if (t.y < 20 && t.x < M5.Display.width() / 2) { onRegionTap(); return; }
+  // tap the top-right area (battery/GPS/SND) to mute/unmute the fare beep
+  if (t.y < 20 && t.x >= M5.Display.width() / 2) { onSoundTap(); return; }
 }
 
 // ---------------- Arduino entry points ----------------
