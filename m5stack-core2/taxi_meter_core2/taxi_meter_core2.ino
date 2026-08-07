@@ -118,6 +118,7 @@ unsigned long elapsedSec = 0;
 int tollCount = 0;
 double lastSpeedKmh = 0;
 bool nightNow = false;
+long lastPayable = -1; // -1 = not initialized yet, skip the beep on the next check
 
 bool haveLastFix = false;
 double lastLat = 0, lastLng = 0;
@@ -189,6 +190,23 @@ long computeNight(long fare) {
   return (long)round(fare * r.nightAmount / 100.0);
 }
 
+long computeTotalPayable() {
+  long fare = computeFare();
+  return fare + computeNight(fare) + (long)tollCount * HIGHWAY_FEE;
+}
+
+// Real meters click/beep every time the total jumps -- distance, waiting
+// time, a highway toll press, or night surcharge kicking in all count.
+// Called every loop() so a toll-button jump beeps immediately rather
+// than waiting for the next screen redraw.
+void checkFareBeep() {
+  long total = computeTotalPayable();
+  if (lastPayable >= 0 && total > lastPayable) {
+    M5.Speaker.tone(2200, 90);
+  }
+  lastPayable = total;
+}
+
 void formatHMS(unsigned long totalSec, char* buf) {
   unsigned long h = totalSec / 3600;
   unsigned long m = (totalSec % 3600) / 60;
@@ -245,6 +263,7 @@ void resetTrip() {
   elapsedSec = 0;
   tollCount = 0;
   resetArmedAt = 0;
+  lastPayable = -1;
 }
 
 void onVacant() {
@@ -481,6 +500,7 @@ void setup() {
   M5.begin(cfg);
   M5.Display.setRotation(1);
   M5.Display.setColorDepth(16);
+  M5.Speaker.setVolume(200);
   initColors();
   layoutButtons();
 
@@ -499,6 +519,7 @@ void loop() {
   M5.update();
   gpsTick();
   handleTouch();
+  checkFareBeep();
 
   unsigned long now = millis();
   if (now - lastSecondMillis >= 1000) {
